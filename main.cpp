@@ -1,6 +1,7 @@
 #include "MiniGit.h"
 #include <iostream>
 
+// Print the usage/help instructions for MiniGit commands
 void printUsage() {
     std::cout << "MiniGit - Lightweight VCS\n\nUsage:\n"
               << "  minigit init                    - Initialize repo\n"
@@ -15,26 +16,50 @@ void printUsage() {
 }
 
 int main(int argc, char* argv[]) {
-    MiniGit git;
+    MiniGit git;  // Create MiniGit instance to perform operations
+
+    // Check if at least one command-line argument is given
     if (argc < 2) {
-        printUsage();
-        return 1;
+        printUsage();  // If no command, print usage instructions
+        return 1;      // Exit with error code
     }
-    std::string cmd = argv[1];
-    if (cmd == "init") git.init();
-    else if (cmd == "add" && argc >= 3) git.add(argv[2]);
-    else if (cmd == "commit" && argc >= 4 && std::string(argv[2]) == "-m") git.commit(argv[3]);
-    else if (cmd == "log") git.log();
-    else if (cmd == "status") git.status();
+
+    std::string cmd = argv[1];  // Command is first argument
+
+    // Dispatch commands to corresponding MiniGit methods based on input
+    if (cmd == "init")
+        git.init();  // Initialize repository
+
+    else if (cmd == "add" && argc >= 3)
+        git.add(argv[2]);  // Stage a file (second argument)
+
+    else if (cmd == "commit" && argc >= 4 && std::string(argv[2]) == "-m")
+        git.commit(argv[3]);  // Commit staged files with message (third argument)
+
+    else if (cmd == "log")
+        git.log();  // Show commit history
+
+    else if (cmd == "status")
+        git.status();  // Show repository status and staged files
+
     else if (cmd == "branch") {
-        if (argc >= 3) git.branch(argv[2]);
-        else git.listBranches();
+        // If branch name specified, create new branch; else list branches
+        if (argc >= 3)
+            git.branch(argv[2]);
+        else
+            git.listBranches();
     }
-    else if (cmd == "checkout" && argc >= 3) git.checkout(argv[2]);
-    else if (cmd == "help") printUsage();
+
+    else if (cmd == "checkout" && argc >= 3)
+        git.checkout(argv[2]);  // Switch to branch or commit hash
+
+    else if (cmd == "help")
+        printUsage();  // Print help instructions
+
     else {
         std::cout << "Invalid command.\n";
-        printUsage();
+        printUsage();  // Print usage if command not recognized
     }
-    return 0;
+
+    return 0;  // Exit program successfully
 }
