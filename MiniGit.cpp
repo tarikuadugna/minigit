@@ -8,13 +8,15 @@
 
 namespace fs = std::filesystem;
 
+// Computes a hash for the given file content using std::hash
 std::string MiniGit::computeHash(const std::string& content) {
     std::hash<std::string> hasher;
     std::stringstream ss;
     ss << std::hex << hasher(content);
-    return ss.str();
+    return ss.str(); // Return hexadecimal representation of hash
 }
 
+// Returns the current system time as a formatted string
 std::string MiniGit::getCurrentTime() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -23,6 +25,7 @@ std::string MiniGit::getCurrentTime() {
     return ss.str();
 }
 
+// Writes content to a file
 void MiniGit::writeToFile(const std::string& filepath, const std::string& content) {
     std::ofstream file(filepath);
     if (file.is_open()) {
@@ -31,6 +34,7 @@ void MiniGit::writeToFile(const std::string& filepath, const std::string& conten
     }
 }
 
+// Reads and returns file content from the given path
 std::string MiniGit::readFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) return "";
@@ -39,6 +43,7 @@ std::string MiniGit::readFromFile(const std::string& filepath) {
     return buffer.str();
 }
 
+// Saves a commit object to a file in the .minigit/objects directory
 void MiniGit::saveCommit(const Commit& commit) {
     std::string commitPath = objectsDir + "/" + commit.hash;
     std::stringstream ss;
@@ -46,6 +51,7 @@ void MiniGit::saveCommit(const Commit& commit) {
        << "timestamp:" << commit.timestamp << "\n"
        << "parent:" << commit.parent << "\n"
        << "files:";
+    // Add file-to-blob mappings
     for (size_t i = 0; i < commit.filenames.size(); ++i) {
         ss << commit.filenames[i] << ":" << commit.blobHashes[i];
         if (i < commit.filenames.size() - 1) ss << ",";
@@ -54,6 +60,7 @@ void MiniGit::saveCommit(const Commit& commit) {
     writeToFile(commitPath, ss.str());
 }
 
+// Loads and reconstructs a commit from a saved commit file
 MiniGit::Commit MiniGit::loadCommit(const std::string& hash) {
     Commit commit;
     commit.hash = hash;
@@ -80,18 +87,21 @@ MiniGit::Commit MiniGit::loadCommit(const std::string& hash) {
     return commit;
 }
 
+// Updates HEAD pointer to a new commit hash and saves branch info
 void MiniGit::updateHEAD(const std::string& commitHash) {
     writeToFile(headFile, currentBranch + ":" + commitHash);
     branches[currentBranch] = commitHash;
     saveBranches();
 }
 
+// Retrieves the current HEAD commit hash
 std::string MiniGit::getHEAD() {
     std::string content = readFromFile(headFile);
     size_t colon = content.find(':');
     return (colon != std::string::npos) ? content.substr(colon + 1) : "";
 }
 
+// Loads all branches and their latest commit hashes
 void MiniGit::loadBranches() {
     branches.clear();
     std::string content = readFromFile(refsDir + "/branches");
@@ -105,6 +115,7 @@ void MiniGit::loadBranches() {
     if (branches.empty()) branches["master"] = "";
 }
 
+// Saves all branch mappings to file
 void MiniGit::saveBranches() {
     std::stringstream ss;
     for (const auto& b : branches)
@@ -112,6 +123,7 @@ void MiniGit::saveBranches() {
     writeToFile(refsDir + "/branches", ss.str());
 }
 
+// Loads staged files from the index file
 void MiniGit::loadStagedFiles() {
     stagedFiles.clear();
     std::istringstream iss(readFromFile(indexFile));
@@ -120,12 +132,14 @@ void MiniGit::loadStagedFiles() {
         if (!filename.empty()) stagedFiles.insert(filename);
 }
 
+// Saves currently staged files to index file
 void MiniGit::saveStagedFiles() {
     std::stringstream ss;
     for (const auto& file : stagedFiles) ss << file << "\n";
     writeToFile(indexFile, ss.str());
 }
 
+// Initializes a new MiniGit repository with directories and base files
 void MiniGit::init() {
     if (fs::exists(minigitDir)) {
         std::cout << "Repository already initialized.\n";
@@ -141,6 +155,7 @@ void MiniGit::init() {
     std::cout << "Initialized empty MiniGit repository.\n";
 }
 
+// Stages a file by hashing its contents and adding it to index
 void MiniGit::add(const std::string& filename) {
     if (!fs::exists(filename)) {
         std::cout << "File '" << filename << "' not found.\n";
@@ -155,6 +170,7 @@ void MiniGit::add(const std::string& filename) {
     std::cout << "Added '" << filename << "' to staging area.\n";
 }
 
+// Commits staged changes with a message and saves it as a new commit
 void MiniGit::commit(const std::string& message) {
     loadStagedFiles();
     loadBranches();
@@ -162,19 +178,25 @@ void MiniGit::commit(const std::string& message) {
         std::cout << "No changes to commit.\n";
         return;
     }
+
     Commit commit;
     commit.message = message;
     commit.timestamp = getCurrentTime();
     commit.parent = getHEAD();
+
+    // Add file contents and hashes to commit
     for (const auto& file : stagedFiles) {
         std::string content = readFromFile(file);
         std::string hash = computeHash(content);
         commit.filenames.push_back(file);
         commit.blobHashes.push_back(hash);
     }
+
+    // Create commit hash from metadata
     std::string fullContent = message + commit.timestamp + commit.parent;
     for (const auto& h : commit.blobHashes) fullContent += h;
     commit.hash = computeHash(fullContent);
+
     saveCommit(commit);
     updateHEAD(commit.hash);
     stagedFiles.clear();
@@ -182,6 +204,7 @@ void MiniGit::commit(const std::string& message) {
     std::cout << "Committed changes with hash: " << commit.hash << "\n";
 }
 
+// Prints commit history from HEAD backwards through parent hashes
 void MiniGit::log() {
     loadBranches();
     std::string current = getHEAD();
@@ -192,6 +215,7 @@ void MiniGit::log() {
     }
 }
 
+// Shows current branch and files staged for the next commit
 void MiniGit::status() {
     loadBranches();
     loadStagedFiles();
@@ -203,6 +227,7 @@ void MiniGit::status() {
     }
 }
 
+// Creates a new branch pointing to current HEAD
 void MiniGit::branch(const std::string& name) {
     loadBranches();
     if (branches.find(name) != branches.end()) {
@@ -214,6 +239,7 @@ void MiniGit::branch(const std::string& name) {
     std::cout << "Created branch '" << name << "'.\n";
 }
 
+// Lists all branches and marks the current one with '*'
 void MiniGit::listBranches() {
     loadBranches();
     std::cout << "Branches:\n";
@@ -221,6 +247,7 @@ void MiniGit::listBranches() {
         std::cout << (name == currentBranch ? "* " : "  ") << name << "\n";
 }
 
+// Switches to another branch and restores files from the commit
 void MiniGit::checkout(const std::string& target) {
     loadBranches();
     if (branches.count(target)) {
@@ -238,6 +265,7 @@ void MiniGit::checkout(const std::string& target) {
     }
 }
 
+// Placeholder for merge functionality
 void MiniGit::merge(const std::string& branchName) {
     std::cout << "Merge not implemented in this version.\n";
 }
