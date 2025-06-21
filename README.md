@@ -51,6 +51,97 @@ MiniGit is a lightweight version control system implemented in C++ that simulate
 - **Implementation**: `std::set<std::string> stagedFiles`
 - **DSA Concept**: Set for unique file tracking
 
+
+
+## 🧠 Core Data Structures
+
+### 1. **Commit Objects (DAG Structure)**
+```cpp
+struct Commit {
+    std::string hash;                    // Unique commit identifier
+    std::string message;                 // Commit message
+    std::string timestamp;               // Creation time
+    std::string parent;                  // Parent commit hash (forms DAG)
+    std::vector<std::string> blobHashes; // File content hashes
+    std::vector<std::string> filenames;  // Associated filenames
+};
+```
+- **DSA Concept**: **Directed Acyclic Graph (DAG)**
+- **Purpose**: Represents commit history with parent-child relationships
+- **Usage**: History traversal, branch tracking, merge operations
+
+### 2. **Branch References (Hash Map)**
+```cpp
+std::map<std::string, std::string> branches;
+```
+- **DSA Concept**: **Hash Map / Dictionary**
+- **Purpose**: Maps branch names to their latest commit hashes
+- **Usage**: O(1) branch lookup, switching between branches
+- **Example**: `{"master": "abc123", "feature": "def456"}`
+
+### 3. **Staging Area (Set)**
+```cpp
+std::set<std::string> stagedFiles;
+```
+- **DSA Concept**: **Set (Unique Collection)**
+- **Purpose**: Tracks files ready for next commit
+- **Usage**: Prevents duplicate file staging, efficient membership testing
+- **Persistence**: Stored in `.minigit/index` file
+
+### 4. **Blob Storage (Hash-based)**
+```cpp
+struct Blob {
+    std::string hash;        // Content-based hash
+    std::string content;     // File content
+    std::string filename;    // Original filename
+};
+```
+- **DSA Concept**: **Hashing for Content-Addressable Storage**
+- **Purpose**: Store file snapshots with unique identifiers
+- **Storage**: Files saved as `.minigit/objects/<hash>`
+- **Benefit**: Deduplication - identical files share same hash
+
+## 🔄 How These Structures Work Together
+
+### **DAG Traversal for History**
+```cpp
+// Log traversal using linked structure
+while (!currentCommit.empty()) {
+    Commit commit = loadCommit(currentCommit);
+    displayCommit(commit);
+    currentCommit = commit.parent;  // Follow parent pointer
+}
+```
+
+### **Hash Map for Branch Operations**
+```cpp
+// O(1) branch switching
+if (branches.find(branchName) != branches.end()) {
+    currentBranch = branchName;
+    std::string commitHash = branches[branchName];
+}
+```
+
+### **Set for Staging Management**
+```cpp
+// Efficient file tracking
+stagedFiles.insert(filename);        // Add to staging
+if (stagedFiles.empty()) {          // Check if anything to commit
+    std::cout << "No changes to commit\n";
+}
+```
+
+## 📊 Data Structure Complexity
+
+| Operation | Data Structure | Time Complexity |
+|-----------|---------------|-----------------|
+| Branch lookup | Hash Map | O(1) |
+| File staging | Set | O(log n) |
+| History traversal | DAG | O(h) where h = history depth |
+| Blob retrieval | Hash Table | O(1) |
+| Commit creation | Vector | O(n) where n = files |
+
+
 ## Architecture Design
 
 ### Directory Structure
