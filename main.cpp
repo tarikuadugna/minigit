@@ -272,6 +272,27 @@ int main(int argc, char* argv[]) {
             }
             git.merge(args[1]);
         }
+
+        else if (command == "reset") {
+    if (argc > 2 && std::string(argv[2]) == "--hard") {
+        if (argc > 3) {
+            git.resetHard(argv[3]);
+        } else {
+            std::cout << Colors::RED << "❌ Please specify a commit hash for hard reset." << Colors::RESET << "\n";
+        }
+    } else if (argc > 2) {
+        git.reset(argv[2]);
+    } else {
+        git.reset(); // Reset all
+    }
+    }
+    else if (command == "rm") {
+    if (argc > 2) {
+        git.remove(argv[2]);
+    } else {
+        std::cout << Colors::RED << "❌ Please specify a filename to remove." << Colors::RESET << "\n";
+        }
+    }
         else {
             std::cout << Colors::RED << "❌ Unknown command: " << command << Colors::RESET << "\n";
             std::cout << Colors::GREEN << "Use 'minigit help' for available commands." << Colors::RESET << "\n";
