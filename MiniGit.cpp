@@ -20,7 +20,7 @@ namespace Colors {
     const std::string MAGENTA = "\033[35m";
     const std::string CYAN = "\033[36m";
     const std::string BOLD = "\033[1m";
-    const std::string DIM = "\033[2m";
+  
 }
 
 // Utility function to split string into lines
@@ -116,7 +116,7 @@ void MiniGit::showWorkingDiff() {
     }
     
     if (!hasDiffs) {
-        std::cout << Colors::DIM << "No differences between staged files and working directory." << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "No differences between staged files and working directory." << Colors::RESET << "\n";
     }
 }
 
@@ -167,7 +167,7 @@ void MiniGit::showStagedDiff() {
     }
     
     if (!hasDiffs) {
-        std::cout << Colors::DIM << "No differences between staged files and last commit." << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "No differences between staged files and last commit." << Colors::RESET << "\n";
     }
 }
 
@@ -214,7 +214,7 @@ void MiniGit::showCommitDiff(const std::string& commit1, const std::string& comm
     }
     
     if (!hasDiffs) {
-        std::cout << Colors::DIM << "No differences between the commits." << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "No differences between the commits." << Colors::RESET << "\n";
     }
 }
 
@@ -268,7 +268,7 @@ void MiniGit::diff(const std::string& option1, const std::string& option2) {
         }
         
         if (!hasDiffs) {
-            std::cout << Colors::DIM << "No differences found." << Colors::RESET << "\n";
+            std::cout << Colors::GREEN << "No differences found." << Colors::RESET << "\n";
         }
     }
 }
@@ -283,7 +283,7 @@ void MiniGit::status() {
     // Check if there's an ongoing merge
     if (fs::exists(minigitDir + "/MERGE_HEAD")) {
         std::cout << Colors::YELLOW << "⚠️  You are in the middle of a merge." << Colors::RESET << "\n";
-        std::cout << Colors::DIM << "   (fix conflicts and run 'commit' to complete the merge)" << Colors::RESET << "\n\n";
+        std::cout << Colors::GREEN << "   (fix conflicts and run 'commit' to complete the merge)" << Colors::RESET << "\n\n";
     }
     
     // Check for unstaged changes
@@ -349,7 +349,7 @@ void MiniGit::status() {
     // Show modified files
     if (!modifiedFiles.empty()) {
         std::cout << Colors::RED << "Changes not staged for commit:" << Colors::RESET << "\n";
-        std::cout << Colors::DIM << "  (use 'add <file>' to stage changes)" << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "  (use 'add <file>' to stage changes)" << Colors::RESET << "\n";
         for (const auto& file : modifiedFiles) {
             std::cout << Colors::RED << "  modified:   " << file << Colors::RESET << "\n";
         }
@@ -359,7 +359,7 @@ void MiniGit::status() {
     // Show untracked files
     if (!untrackedFiles.empty()) {
         std::cout << Colors::RED << "Untracked files:" << Colors::RESET << "\n";
-        std::cout << Colors::DIM << "  (use 'add <file>' to include in what will be committed)" << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "  (use 'add <file>' to include in what will be committed)" << Colors::RESET << "\n";
         for (const auto& file : untrackedFiles) {
             std::cout << Colors::RED << "  " << file << Colors::RESET << "\n";
         }
@@ -390,7 +390,7 @@ void MiniGit::log(int maxCommits) {
         }
         std::cout << "\n";
         
-        std::cout << Colors::DIM << "Date: " << c.timestamp << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "Date: " << c.timestamp << Colors::RESET << "\n";
         std::cout << "\n    " << c.message << "\n\n";
         
         current = c.parent;
@@ -705,13 +705,13 @@ void MiniGit::listBranches() {
         if (name == currentBranch) {
             std::cout << Colors::GREEN << "* " << name << Colors::RESET;
             if (!hash.empty()) {
-                std::cout << Colors::DIM << " (" << hash.substr(0, 8) << ")" << Colors::RESET;
+                std::cout << Colors::GREEN << " (" << hash.substr(0, 8) << ")" << Colors::RESET;
             }
             std::cout << "\n";
         } else {
             std::cout << "  " << name;
             if (!hash.empty()) {
-                std::cout << Colors::DIM << " (" << hash.substr(0, 8) << ")" << Colors::RESET;
+                std::cout << Colors::GREEN << " (" << hash.substr(0, 8) << ")" << Colors::RESET;
             }
             std::cout << "\n";
         }
@@ -742,7 +742,7 @@ void MiniGit::checkout(const std::string& target) {
             if (targetFiles.find(filename) == targetFiles.end()) {
                 if (fs::exists(filename)) {
                     fs::remove(filename);
-                    std::cout << Colors::DIM << "Removed: " << filename << Colors::RESET << "\n";
+                    std::cout << Colors::GREEN << "Removed: " << filename << Colors::RESET << "\n";
                 }
             }
         }
@@ -751,7 +751,7 @@ void MiniGit::checkout(const std::string& target) {
         for (const auto& [filename, hash] : targetFiles) {
             std::string content = readFromFile(objectsDir + "/" + hash);
             writeToFile(filename, content);
-            std::cout << Colors::DIM << "Updated: " << filename << Colors::RESET << "\n";
+            std::cout << Colors::GREEN << "Updated: " << filename << Colors::RESET << "\n";
         }
         
         currentBranch = target;
@@ -856,7 +856,7 @@ void MiniGit::performThreeWayMerge(const std::string& currentHead, const std::st
         if (currentHash == targetHash) {
             if (!currentHash.empty()) {
                 mergedFiles[filename] = currentHash;
-                std::cout << Colors::DIM << "  Unchanged: " << filename << Colors::RESET << "\n";
+                std::cout << Colors::GREEN << "  Unchanged: " << filename << Colors::RESET << "\n";
             }
             continue;
         }
@@ -888,7 +888,7 @@ void MiniGit::performThreeWayMerge(const std::string& currentHead, const std::st
         
         // Case 5: File deleted in both branches
         if (!baseHash.empty() && currentHash.empty() && targetHash.empty()) {
-            std::cout << Colors::DIM << "  Deleted in both: " << filename << Colors::RESET << "\n";
+            std::cout << Colors::GREEN << "  Deleted in both: " << filename << Colors::RESET << "\n";
             continue;
         }
         
@@ -911,7 +911,7 @@ void MiniGit::performThreeWayMerge(const std::string& currentHead, const std::st
         // Save merge state
         writeToFile(minigitDir + "/MERGE_HEAD", targetHead);
         std::cout << Colors::RED << "❌ Merge conflicts detected. Fix conflicts and commit to complete merge." << Colors::RESET << "\n";
-        std::cout << Colors::DIM << "   Files with conflicts have been marked with conflict markers." << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "   Files with conflicts have been marked with conflict markers." << Colors::RESET << "\n";
         return;
     }
     
@@ -942,6 +942,124 @@ void MiniGit::performThreeWayMerge(const std::string& currentHead, const std::st
     std::cout << Colors::GREEN << "✅ Merge completed successfully." << Colors::RESET << "\n";
 }
 
+
+// Remove file from staging area
+void MiniGit::reset(const std::string& filename) {
+    loadStagedFiles();
+    
+    if (filename.empty()) {
+        // Reset all staged files
+        if (stagedFiles.empty()) {
+            std::cout << Colors::YELLOW << "⚠️  No files to unstage." << Colors::RESET << "\n";
+            return;
+        }
+        
+        stagedFiles.clear();
+        saveStagedFiles();
+        std::cout << Colors::GREEN << "✅ Unstaged all files." << Colors::RESET << "\n";
+    } else {
+        // Reset specific file
+        if (stagedFiles.find(filename) == stagedFiles.end()) {
+            std::cout << Colors::YELLOW << "⚠️  File '" << filename << "' is not staged." << Colors::RESET << "\n";
+            return;
+        }
+        
+        stagedFiles.erase(filename);
+        saveStagedFiles();
+        std::cout << Colors::GREEN << "✅ Unstaged '" << filename << "'." << Colors::RESET << "\n";
+    }
+}
+
+// Remove file from both working directory and staging area
+void MiniGit::remove(const std::string& filename) {
+    if (filename.empty()) {
+        std::cout << Colors::RED << "❌ Please specify a filename to remove." << Colors::RESET << "\n";
+        return;
+    }
+    
+    loadStagedFiles();
+    bool fileExisted = false;
+    
+    // Remove from working directory
+    if (fs::exists(filename)) {
+        fs::remove(filename);
+        fileExisted = true;
+        std::cout << Colors::GREEN << "✅ Removed '" << filename << "' from working directory." << Colors::RESET << "\n";
+    }
+    
+    // Remove from staging area
+    if (stagedFiles.find(filename) != stagedFiles.end()) {
+        stagedFiles.erase(filename);
+        saveStagedFiles();
+        fileExisted = true;
+        std::cout << Colors::GREEN << "✅ Removed '" << filename << "' from staging area." << Colors::RESET << "\n";
+    }
+    
+    if (!fileExisted) {
+        std::cout << Colors::YELLOW << "⚠️  File '" << filename << "' not found in working directory or staging area." << Colors::RESET << "\n";
+    }
+}
+
+// Reset working directory to a specific commit (hard reset)
+void MiniGit::resetHard(const std::string& commitHash) {
+    if (commitHash.empty()) {
+        std::cout << Colors::RED << "❌ Please specify a commit hash." << Colors::RESET << "\n";
+        return;
+    }
+    
+    // Check if commit exists
+    if (!fs::exists(objectsDir + "/" + commitHash)) {
+        std::cout << Colors::RED << "❌ Commit '" << commitHash.substr(0, 8) << "' not found." << Colors::RESET << "\n";
+        return;
+    }
+    
+    loadStagedFiles();
+    loadBranches();
+    
+    // Warn about losing changes
+    if (!stagedFiles.empty()) {
+        std::cout << Colors::YELLOW << "⚠️  WARNING: This will remove all staged changes!" << Colors::RESET << "\n";
+        std::cout << Colors::GREEN << "Continue? (y/N): " << Colors::RESET;
+        std::string response;
+        std::getline(std::cin, response);
+        if (response != "y" && response != "Y") {
+            std::cout << Colors::BLUE << "Reset cancelled." << Colors::RESET << "\n";
+            return;
+        }
+    }
+    
+    // Get target commit files
+    std::map<std::string, std::string> targetFiles = getCommitFiles(commitHash);
+    std::map<std::string, std::string> currentFiles = getCommitFiles(getHEAD());
+    
+    // Remove files that exist in current but not in target
+    for (const auto& [filename, hash] : currentFiles) {
+        if (targetFiles.find(filename) == targetFiles.end()) {
+            if (fs::exists(filename)) {
+                fs::remove(filename);
+                std::cout << Colors::GREEN << "Removed: " << filename << Colors::RESET << "\n";
+            }
+        }
+    }
+    
+    // Add/update files from target commit
+    for (const auto& [filename, hash] : targetFiles) {
+        std::string content = readFromFile(objectsDir + "/" + hash);
+        writeToFile(filename, content);
+        std::cout << Colors::GREEN << "Updated: " << filename << Colors::RESET << "\n";
+    }
+    
+    // Clear staging area and update HEAD
+    stagedFiles.clear();
+    saveStagedFiles();
+    branches[currentBranch] = commitHash;
+    updateHEAD(commitHash);
+    
+    std::cout << Colors::GREEN << "✅ Hard reset to commit " << Colors::BOLD << commitHash.substr(0, 8) << Colors::RESET << "\n";
+}
+
+
+
 // Helper function to show help/usage information
 void MiniGit::showHelp() {
     std::cout << Colors::BOLD << Colors::CYAN << "MiniGit - A Simplified Git Implementation" << Colors::RESET << "\n\n";
@@ -969,10 +1087,14 @@ void MiniGit::showHelp() {
     std::cout << "  diff <commit1> <commit2>   Show differences between two commits\n\n";
     
     std::cout << Colors::BOLD << "EXAMPLES:" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit init" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit add file.txt" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit commit \"Initial commit\"" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit branch feature" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit checkout feature" << Colors::RESET << "\n";
-    std::cout << Colors::DIM << "  minigit diff --staged" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit init" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit add file.txt" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit commit \"Initial commit\"" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit branch feature" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit checkout feature" << Colors::RESET << "\n";
+    std::cout << Colors::GREEN << "  minigit diff --staged" << Colors::RESET << "\n";
+
+    std::cout << Colors::GREEN << "  reset [file]" << Colors::RESET << "           Unstage file(s) from staging area\n";
+std::cout << Colors::GREEN << "  reset --hard <commit>" << Colors::RESET << "   Reset working directory to commit\n";
+std::cout << Colors::GREEN << "  rm <file>" << Colors::RESET ;   
 }
