@@ -82,6 +82,10 @@ public:
     
     // Help system
     void showHelp();
+
+    void reset(const std::string& filename = "");
+    void remove(const std::string& filename);
+    void resetHard(const std::string& commitHash);
 };
 
 #endif // MINIGIT_H
