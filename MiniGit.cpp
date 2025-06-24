@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <chrono>
 #include <iomanip>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -139,6 +140,60 @@ void MiniGit::saveStagedFiles() {
     writeToFile(indexFile, ss.str());
 }
 
+// Clean up merge state files after successful merge
+void MiniGit::cleanupMergeState() {
+    std::string mergeHeadFile = minigitDir + "/MERGE_HEAD";
+    if (fs::exists(mergeHeadFile)) {
+        fs::remove(mergeHeadFile);
+    }
+}
+
+// Helper function to find common ancestor of two commits
+std::string MiniGit::findCommonAncestor(const std::string& commit1, const std::string& commit2) {
+    if (commit1.empty() || commit2.empty()) return "";
+    
+    // Get all ancestors of commit1
+    std::set<std::string> ancestors1;
+    std::string current = commit1;
+    while (!current.empty()) {
+        ancestors1.insert(current);
+        Commit c = loadCommit(current);
+        current = c.parent;
+    }
+    
+    // Find first common ancestor in commit2's history
+    current = commit2;
+    while (!current.empty()) {
+        if (ancestors1.count(current)) return current;
+        Commit c = loadCommit(current);
+        current = c.parent;
+    }
+    
+    return ""; // No common ancestor found
+}
+
+// Helper function to get all files from a commit
+std::map<std::string, std::string> MiniGit::getCommitFiles(const std::string& commitHash) {
+    std::map<std::string, std::string> files;
+    if (commitHash.empty()) return files;
+    
+    Commit commit = loadCommit(commitHash);
+    for (size_t i = 0; i < commit.filenames.size(); ++i) {
+        files[commit.filenames[i]] = commit.blobHashes[i];
+    }
+    return files;
+}
+
+// Helper function to check if two file contents are the same
+bool MiniGit::filesAreSame(const std::string& hash1, const std::string& hash2) {
+    if (hash1 == hash2) return true;
+    if (hash1.empty() || hash2.empty()) return false;
+    
+    std::string content1 = readFromFile(objectsDir + "/" + hash1);
+    std::string content2 = readFromFile(objectsDir + "/" + hash2);
+    return content1 == content2;
+}
+
 // Initializes a new MiniGit repository with directories and base files
 void MiniGit::init() {
     if (fs::exists(minigitDir)) {
@@ -208,6 +263,10 @@ void MiniGit::commit(const std::string& message) {
 void MiniGit::log() {
     loadBranches();
     std::string current = getHEAD();
+    if (current.empty()) {
+        std::cout << "No commits yet.\n";
+        return;
+    }
     while (!current.empty()) {
         Commit c = loadCommit(current);
         std::cout << "Commit: " << c.hash << "\nDate: " << c.timestamp << "\nMessage: " << c.message << "\n\n";
@@ -220,10 +279,20 @@ void MiniGit::status() {
     loadBranches();
     loadStagedFiles();
     std::cout << "On branch " << currentBranch << "\n";
-    if (stagedFiles.empty()) std::cout << "No files staged for commit.\n";
-    else {
-        std::cout << "Files staged:\n";
-        for (const auto& file : stagedFiles) std::cout << "  " << file << "\n";
+    
+    // Check if there's an ongoing merge
+    if (fs::exists(minigitDir + "/MERGE_HEAD")) {
+        std::cout << "You are in the middle of a merge.\n";
+        std::cout << "  (fix conflicts and run commit to complete the merge)\n";
+    }
+    
+    if (stagedFiles.empty()) {
+        std::cout << "No files staged for commit.\n";
+    } else {
+        std::cout << "Files staged for commit:\n";
+        for (const auto& file : stagedFiles) {
+            std::cout << "  " << file << "\n";
+        }
     }
 }
 
@@ -231,7 +300,7 @@ void MiniGit::status() {
 void MiniGit::branch(const std::string& name) {
     loadBranches();
     if (branches.find(name) != branches.end()) {
-        std::cout << "Branch already exists.\n";
+        std::cout << "Branch '" << name << "' already exists.\n";
         return;
     }
     branches[name] = getHEAD();
@@ -243,29 +312,246 @@ void MiniGit::branch(const std::string& name) {
 void MiniGit::listBranches() {
     loadBranches();
     std::cout << "Branches:\n";
-    for (const auto& [name, hash] : branches)
+    for (const auto& [name, hash] : branches) {
         std::cout << (name == currentBranch ? "* " : "  ") << name << "\n";
+    }
 }
 
 // Switches to another branch and restores files from the commit
 void MiniGit::checkout(const std::string& target) {
     loadBranches();
+    loadStagedFiles();
+    
+    // Check for uncommitted changes
+    if (!stagedFiles.empty()) {
+        std::cout << "Cannot checkout: you have uncommitted changes. Please commit them first.\n";
+        return;
+    }
+    
     if (branches.count(target)) {
         currentBranch = target;
         std::string hash = branches[target];
+        
+        // Remove all current files first (simple approach)
+        // In a real implementation, you'd be more careful about this
+        
         if (!hash.empty()) {
             Commit c = loadCommit(hash);
-            for (size_t i = 0; i < c.filenames.size(); ++i)
+            for (size_t i = 0; i < c.filenames.size(); ++i) {
                 writeToFile(c.filenames[i], readFromFile(objectsDir + "/" + c.blobHashes[i]));
+            }
         }
         updateHEAD(hash);
         std::cout << "Switched to branch '" << target << "'.\n";
     } else {
-        std::cout << "Unknown branch or hash.\n";
+        std::cout << "Branch '" << target << "' does not exist.\n";
     }
 }
 
-// Placeholder for merge functionality
+// Main merge implementation
 void MiniGit::merge(const std::string& branchName) {
-    std::cout << "Merge not implemented in this version.\n";
+    loadBranches();
+    loadStagedFiles();
+    
+    // Check if branch exists
+    if (branches.find(branchName) == branches.end()) {
+        std::cout << "Branch '" << branchName << "' does not exist.\n";
+        return;
+    }
+    
+    // Can't merge branch with itself
+    if (branchName == currentBranch) {
+        std::cout << "Cannot merge branch with itself.\n";
+        return;
+    }
+    
+    // Check for uncommitted changes
+    if (!stagedFiles.empty()) {
+        std::cout << "Cannot merge: you have uncommitted changes. Please commit or unstage them first.\n";
+        return;
+    }
+    
+    std::string currentHead = getHEAD();
+    std::string targetHead = branches[branchName];
+    
+    // Handle empty branches
+    if (currentHead.empty() && targetHead.empty()) {
+        std::cout << "Nothing to merge - both branches are empty.\n";
+        return;
+    }
+    
+    if (currentHead.empty()) {
+        // Current branch is empty, fast-forward to target
+        branches[currentBranch] = targetHead;
+        updateHEAD(targetHead);
+        if (!targetHead.empty()) {
+            Commit c = loadCommit(targetHead);
+            for (size_t i = 0; i < c.filenames.size(); ++i) {
+                writeToFile(c.filenames[i], readFromFile(objectsDir + "/" + c.blobHashes[i]));
+            }
+        }
+        std::cout << "Fast-forward merge completed.\n";
+        return;
+    }
+    
+    if (targetHead.empty()) {
+        std::cout << "Nothing to merge - target branch is empty.\n";
+        return;
+    }
+    
+    // Check if target is already merged (current contains target)
+    std::string temp = currentHead;
+    while (!temp.empty()) {
+        if (temp == targetHead) {
+            std::cout << "Already up to date.\n";
+            return;
+        }
+        Commit c = loadCommit(temp);
+        temp = c.parent;
+    }
+    
+    // Check for fast-forward merge (target contains current)
+    temp = targetHead;
+    while (!temp.empty()) {
+        if (temp == currentHead) {
+            // Fast-forward merge
+            branches[currentBranch] = targetHead;
+            updateHEAD(targetHead);
+            Commit c = loadCommit(targetHead);
+            for (size_t i = 0; i < c.filenames.size(); ++i) {
+                writeToFile(c.filenames[i], readFromFile(objectsDir + "/" + c.blobHashes[i]));
+            }
+            std::cout << "Fast-forward merge completed.\n";
+            return;
+        }
+        Commit c = loadCommit(temp);
+        temp = c.parent;
+    }
+    
+    // Find common ancestor
+    std::string ancestor = findCommonAncestor(currentHead, targetHead);
+    if (ancestor.empty()) {
+        std::cout << "No common ancestor found. Cannot merge unrelated histories.\n";
+        return;
+    }
+    
+    // Get file states for three-way merge
+    auto ancestorFiles = getCommitFiles(ancestor);
+    auto currentFiles = getCommitFiles(currentHead);
+    auto targetFiles = getCommitFiles(targetHead);
+    
+    // Collect all files involved in the merge
+    std::set<std::string> allFiles;
+    for (const auto& [file, hash] : ancestorFiles) allFiles.insert(file);
+    for (const auto& [file, hash] : currentFiles) allFiles.insert(file);
+    for (const auto& [file, hash] : targetFiles) allFiles.insert(file);
+    
+    // Perform three-way merge
+    bool hasConflicts = false;
+    std::vector<std::string> conflictFiles;
+    
+    for (const std::string& filename : allFiles) {
+        std::string ancestorHash = ancestorFiles.count(filename) ? ancestorFiles[filename] : "";
+        std::string currentHash = currentFiles.count(filename) ? currentFiles[filename] : "";
+        std::string targetHash = targetFiles.count(filename) ? targetFiles[filename] : "";
+        
+        // Determine merge action
+        if (ancestorHash == currentHash && ancestorHash == targetHash) {
+            // No changes in any branch - keep as is
+            continue;
+        } else if (ancestorHash == currentHash && ancestorHash != targetHash) {
+            // Only target branch changed - use target version
+            if (targetHash.empty()) {
+                // File was deleted in target
+                if (fs::exists(filename)) {
+                    fs::remove(filename);
+                    std::cout << "Deleted: " << filename << "\n";
+                }
+            } else {
+                // File was modified in target
+                std::string content = readFromFile(objectsDir + "/" + targetHash);
+                writeToFile(filename, content);
+                std::cout << "Updated: " << filename << "\n";
+            }
+        } else if (ancestorHash != currentHash && ancestorHash == targetHash) {
+            // Only current branch changed - keep current version
+            std::cout << "Kept: " << filename << " (modified in current branch)\n";
+        } else if (currentHash == targetHash) {
+            // Both branches made same change - keep as is
+            std::cout << "Kept: " << filename << " (same changes in both branches)\n";
+        } else {
+            // Conflict: both branches modified differently
+            hasConflicts = true;
+            conflictFiles.push_back(filename);
+            
+            // Create conflict markers in the file
+            std::string currentContent = currentHash.empty() ? "" : readFromFile(objectsDir + "/" + currentHash);
+            std::string targetContent = targetHash.empty() ? "" : readFromFile(objectsDir + "/" + targetHash);
+            
+            std::stringstream conflictContent;
+            conflictContent << "<<<<<<< HEAD (" << currentBranch << ")\n";
+            conflictContent << currentContent;
+            if (!currentContent.empty() && currentContent.back() != '\n') conflictContent << "\n";
+            conflictContent << "=======\n";
+            conflictContent << targetContent;
+            if (!targetContent.empty() && targetContent.back() != '\n') conflictContent << "\n";
+            conflictContent << ">>>>>>> " << branchName << "\n";
+            
+            writeToFile(filename, conflictContent.str());
+            std::cout << "CONFLICT (content): Merge conflict in " << filename << "\n";
+        }
+    }
+    
+    if (hasConflicts) {
+        std::cout << "\nAutomatic merge failed; fix conflicts and then commit the result.\n";
+        std::cout << "Conflicted files:\n";
+        for (const std::string& file : conflictFiles) {
+            std::cout << "  " << file << "\n";
+        }
+        
+        // Stage all files for the merge commit
+        for (const std::string& filename : allFiles) {
+            if (fs::exists(filename)) {
+                stagedFiles.insert(filename);
+            }
+        }
+        saveStagedFiles();
+        
+        // Create merge state file to track ongoing merge
+        std::stringstream mergeState;
+        mergeState << "merging:" << branchName << "\n";
+        mergeState << "head:" << currentHead << "\n";
+        mergeState << "target:" << targetHead << "\n";
+        writeToFile(minigitDir + "/MERGE_HEAD", mergeState.str());
+        
+    } else {
+        // No conflicts - create merge commit automatically
+        Commit mergeCommit;
+        mergeCommit.message = "Merge branch '" + branchName + "' into " + currentBranch;
+        mergeCommit.timestamp = getCurrentTime();
+        mergeCommit.parent = currentHead;
+        
+        // Add all current files to the merge commit
+        for (const std::string& filename : allFiles) {
+            if (fs::exists(filename)) {
+                std::string content = readFromFile(filename);
+                std::string hash = computeHash(content);
+                writeToFile(objectsDir + "/" + hash, content);
+                mergeCommit.filenames.push_back(filename);
+                mergeCommit.blobHashes.push_back(hash);
+            }
+        }
+        
+        // Create commit hash
+        std::string fullContent = mergeCommit.message + mergeCommit.timestamp + mergeCommit.parent + targetHead;
+        for (const auto& h : mergeCommit.blobHashes) fullContent += h;
+        mergeCommit.hash = computeHash(fullContent);
+        
+        saveCommit(mergeCommit);
+        updateHEAD(mergeCommit.hash);
+        cleanupMergeState();
+        
+        std::cout << "Merge completed successfully.\n";
+        std::cout << "Created merge commit: " << mergeCommit.hash << "\n";
+    }
 }
